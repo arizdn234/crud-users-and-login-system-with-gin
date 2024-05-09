@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/models"
+	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/repository"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
