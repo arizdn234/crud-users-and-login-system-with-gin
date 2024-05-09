@@ -1,0 +1,45 @@
+# Ignore binary files and build artifacts
+*.exe
+*.o
+*.out
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+
+# Ignore vendor directories
+vendor/
+
+# Ignore generated files
+cmd/server
+
+# Ignore database files
+*.db
+
+# Ignore IDE and editor-specific files
+.vscode/
+.idea/
+*.iml
+
+# Ignore configuration files
+config/*.yaml
+
+# Ignore log files
+logs/
+
+# Ignore compiled files
+main
+*.exe
+*.out
+*.test
+*.prof
+
+# Ignore macOS system files
+.DS_Store
+
+# Ignore user-specific files
+user.json
+
+# Ignore environment-specific files
+.env
