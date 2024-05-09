@@ -12,7 +12,7 @@
 vendor/
 
 # Ignore generated files
-cmd/server
+# cmd/server
 
 # Ignore database files
 *.db
