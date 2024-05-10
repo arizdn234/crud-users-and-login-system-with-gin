@@ -1,15 +1,19 @@
 package middleware
 
-import "net/http"
+import (
+	"net/http"
 
-func RequireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("auth_token")
-		if err != nil || cookie.Value == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	"github.com/gin-gonic/gin"
+)
+
+func RequireAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cookie, err := c.Cookie("auth_token")
+		if err != nil || cookie == "" {
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
 }
