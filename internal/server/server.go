@@ -12,13 +12,14 @@ func RunServer(r *gin.Engine, db *gorm.DB, port string) *gin.Engine {
 	userRepo := repository.NewUserRepository(db)
 	userHandler := handlers.NewUserHandler(userRepo)
 
+	r.GET("/", userHandler.Welcome)
+
 	userRoute := r.Group("/users")
 	{
 
-		userRoute.GET("/", userHandler.Welcome)
-		userRoute.POST("/users/login", userHandler.UserLogin)
-		userRoute.POST("/users/register", userHandler.UserRegister)
-		userRoute.GET("/users/logout", userHandler.UserLogout)
+		userRoute.POST("/login", userHandler.UserLogin)
+		userRoute.POST("/register", userHandler.UserRegister)
+		userRoute.GET("/logout", userHandler.UserLogout)
 
 		userRoute.Use(middleware.RequireAuth()) // endpoints that require tokens from this endpoint group
 		userRoute.GET("", userHandler.GetAllUsers)
