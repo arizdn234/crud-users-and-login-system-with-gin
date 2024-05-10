@@ -1,37 +1,32 @@
 package server
 
 import (
-	"net/http"
-
+	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/handlers"
 	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/middleware"
 	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/repository"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func NewServer(db *gorm.DB, port string) *http.Server {
+func RunServer(r *gin.Engine, db *gorm.DB, port string) *gin.Engine {
 	userRepo := repository.NewUserRepository(db)
 	userHandler := handlers.NewUserHandler(userRepo)
 
-	r := mux.NewRouter()
+	userRoute := r.Group("/users")
+	{
 
-	// no need login
-	r.HandleFunc("/", userHandler.Welcome).Methods(http.MethodGet)
-	r.HandleFunc("/users/login", userHandler.UserLogin).Methods(http.MethodPost)
-	r.HandleFunc("/users/register", userHandler.UserRegister).Methods(http.MethodPost)
-	r.HandleFunc("/users/logout", userHandler.UserLogout).Methods(http.MethodGet)
+		userRoute.GET("/", userHandler.Welcome)
+		userRoute.POST("/users/login", userHandler.UserLogin)
+		userRoute.POST("/users/register", userHandler.UserRegister)
+		userRoute.GET("/users/logout", userHandler.UserLogout)
 
-	// need login
-	authorizedRoute := r.PathPrefix("/users").Subrouter()
-	authorizedRoute.Use(middleware.RequireAuth)
-	authorizedRoute.HandleFunc("", userHandler.GetAllUsers).Methods(http.MethodGet)
-	authorizedRoute.HandleFunc("/{id}", userHandler.GetUserByID).Methods(http.MethodGet)
-	authorizedRoute.HandleFunc("", userHandler.CreateUser).Methods(http.MethodPost)
-	authorizedRoute.HandleFunc("/{id}", userHandler.UpdateUser).Methods(http.MethodPut)
-	authorizedRoute.HandleFunc("/{id}", userHandler.DeleteUser).Methods(http.MethodDelete)
-
-	return &http.Server{
-		Addr:    ":" + port,
-		Handler: r,
+		userRoute.Use(middleware.RequireAuth()) // endpoints that require tokens from this endpoint group
+		userRoute.GET("", userHandler.GetAllUsers)
+		userRoute.GET("/:id", userHandler.GetUserByID)
+		userRoute.POST("", userHandler.CreateUser)
+		userRoute.PUT("/:id", userHandler.UpdateUser)
+		userRoute.DELETE("/:id", userHandler.DeleteUser)
 	}
+
+	return r
 }
