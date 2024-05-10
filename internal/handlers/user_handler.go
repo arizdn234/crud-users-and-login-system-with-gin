@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/models"
 	"github.com/arizdn234/crud-users-and-login-system-with-gin/internal/repository"
@@ -121,4 +124,126 @@ func (uh *UserHandler) DeleteUser(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (uh *UserHandler) GetAllUsers(c *gin.Context) {
+	var users []models.User
+
+	if err := uh.UserRepository.FindAll(&users); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
+}
+
+func (uh *UserHandler) GetUserByID(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := uh.UserRepository.FindByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+func (uh *UserHandler) UserRegister(c *gin.Context) {
+	var newUser models.User
+	if err := c.BindJSON(&newUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// validate user data
+	if err := uh.validateUser(newUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// email check
+	existingUser, err := uh.UserRepository.FindByEmail(newUser.Email)
+	if err == nil && existingUser != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email already registered"})
+		return
+	}
+
+	// hash
+	hashed, err := utils.HashPassword(newUser.Password + newUser.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	newUser.Password = hashed
+
+	if err := uh.UserRepository.Create(&newUser); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, newUser)
+}
+
+func (uh *UserHandler) UserLogin(c *gin.Context) {
+	var user models.User
+	if err := c.BindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	existingUser, err := uh.UserRepository.FindByEmail(user.Email)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	hashedRequestBodyPassword, _ := utils.HashPassword(user.Password + user.Email)
+
+	if hashedRequestBodyPassword != existingUser.Password {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	// user credentials have been verified
+	// generate jwt token
+	token, err := utils.CreateToken(existingUser.ID, existingUser.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.SetCookie("auth_token", token, int(time.Hour.Seconds()*24), "/", "", false, true)
+
+	c.String(http.StatusOK, "login successful")
+}
+
+func (uh *UserHandler) UserLogout(c *gin.Context) {
+	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+	c.String(http.StatusOK, "logout successful")
+}
+
+func (uh *UserHandler) validateUser(user models.User) error {
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	if !emailRegex.MatchString(user.Email) {
+		return errors.New("invalid email format")
+	}
+
+	if len(user.Password) < 8 {
+		return errors.New("password must be at least 8 characters long")
+	}
+
+	hasUppercase := regexp.MustCompile(`[A-Z]`).MatchString(user.Password)
+	hasLowercase := regexp.MustCompile(`[a-z]`).MatchString(user.Password)
+	hasNumber := regexp.MustCompile(`[0-9]`).MatchString(user.Password)
+
+	if !hasUppercase || !hasLowercase || !hasNumber {
+		return errors.New("password must contain at least one uppercase letter, one lowercase letter, and one number")
+	}
+
+	return nil
 }
