@@ -42,4 +42,4 @@ main
 user.json
 
 # Ignore environment-specific files
-.env
+*.env
