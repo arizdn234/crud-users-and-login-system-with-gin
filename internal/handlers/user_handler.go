@@ -154,39 +154,45 @@ func (uh *UserHandler) GetUserByID(c *gin.Context) {
 }
 
 func (uh *UserHandler) UserRegister(c *gin.Context) {
-	var newUser models.User
+	var newUser models.UserRegister
 	if err := c.BindJSON(&newUser); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	var recordUser = models.User{
+		Name:     newUser.Name,
+		Email:    newUser.Email,
+		Password: newUser.Password,
+	}
+
 	// validate user data
-	if err := uh.validateUser(newUser); err != nil {
+	if err := uh.validateUser(recordUser); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// email check
-	existingUser, err := uh.UserRepository.FindByEmail(newUser.Email)
+	existingUser, err := uh.UserRepository.FindByEmail(recordUser.Email)
 	if err == nil && existingUser != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email already registered"})
 		return
 	}
 
 	// hash
-	hashed, err := utils.HashPassword(newUser.Password + newUser.Email)
+	hashed, err := utils.HashPassword(recordUser.Password + recordUser.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	newUser.Password = hashed
+	recordUser.Password = hashed
 
-	if err := uh.UserRepository.Create(&newUser); err != nil {
+	if err := uh.UserRepository.Create(&recordUser); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, newUser)
+	c.JSON(http.StatusCreated, recordUser)
 }
 
 func (uh *UserHandler) UserLogin(c *gin.Context) {
