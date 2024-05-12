@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -46,6 +47,12 @@ func (uh *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	// validate user data
+	if err := uh.validateUser(user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	hashedPassword, err := utils.HashPassword(user.Password + user.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -68,13 +75,25 @@ func (uh *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var updateReq struct {
+	var updatePayload struct {
 		Name     *string `json:"name"`
 		Email    *string `json:"email"`
 		Password *string `json:"password"`
 	}
 
-	if err := c.BindJSON(&updateReq); err != nil {
+	if err := c.BindJSON(&updatePayload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var userUpdate = models.User{
+		Name:     *updatePayload.Name,
+		Email:    *updatePayload.Email,
+		Password: *updatePayload.Password,
+	}
+
+	// validate user data
+	if err := uh.validateUser(userUpdate); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -85,16 +104,16 @@ func (uh *UserHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	if updateReq.Name != nil {
-		user.Name = *updateReq.Name
+	if updatePayload.Name != nil {
+		user.Name = *updatePayload.Name
 	}
 
-	if updateReq.Email != nil {
-		user.Email = *updateReq.Email
+	if updatePayload.Email != nil {
+		user.Email = *updatePayload.Email
 	}
 
-	if updateReq.Password != nil && *updateReq.Password != "" {
-		hashedPassword, err := utils.HashPassword(*updateReq.Password + user.Email)
+	if updatePayload.Password != nil && *updatePayload.Password != "" {
+		hashedPassword, err := utils.HashPassword(*updatePayload.Password + user.Email)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -123,7 +142,7 @@ func (uh *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Delete user with ID=%v success", id)})
 }
 
 func (uh *UserHandler) GetAllUsers(c *gin.Context) {
@@ -154,61 +173,84 @@ func (uh *UserHandler) GetUserByID(c *gin.Context) {
 }
 
 func (uh *UserHandler) UserRegister(c *gin.Context) {
-	var newUser models.UserRegister
-	if err := c.BindJSON(&newUser); err != nil {
+	var registerPayload models.UserRegister
+	if err := c.BindJSON(&registerPayload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	var recordUser = models.User{
-		Name:     newUser.Name,
-		Email:    newUser.Email,
-		Password: newUser.Password,
+	var user = models.User{
+		Name:     registerPayload.Name,
+		Email:    registerPayload.Email,
+		Password: registerPayload.Password,
 	}
 
 	// validate user data
-	if err := uh.validateUser(recordUser); err != nil {
+	if err := uh.validateUser(user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// email check
-	existingUser, err := uh.UserRepository.FindByEmail(recordUser.Email)
+	existingUser, err := uh.UserRepository.FindByEmail(user.Email)
 	if err == nil && existingUser != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "email already registered"})
 		return
 	}
 
 	// hash
-	hashed, err := utils.HashPassword(recordUser.Password + recordUser.Email)
+	hashed, err := utils.HashPassword(user.Password + user.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	recordUser.Password = hashed
+	user.Password = hashed
 
-	if err := uh.UserRepository.Create(&recordUser); err != nil {
+	if err := uh.UserRepository.Create(&user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, recordUser)
+	c.JSON(http.StatusCreated, user)
 }
 
 func (uh *UserHandler) UserLogin(c *gin.Context) {
-	var user models.User
-	if err := c.BindJSON(&user); err != nil {
+	var loginPayload models.UserLogin
+	if err := c.BindJSON(&loginPayload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	existingUser, err := uh.UserRepository.FindByEmail(user.Email)
+	var userLogin = models.User{
+		Email:    loginPayload.Email,
+		Password: loginPayload.Password,
+	}
+
+	// validate user data
+	if err := uh.validateUser(userLogin); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if loginPayload.Email == "" || loginPayload.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Login data is empty"})
+		return
+	}
+
+	existingUser, err := uh.UserRepository.FindByEmail(loginPayload.Email)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	hashedRequestBodyPassword, _ := utils.HashPassword(user.Password + user.Email)
+	hashedRequestBodyPassword, err := utils.HashPassword(loginPayload.Password + loginPayload.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	fmt.Println(hashedRequestBodyPassword)
+	fmt.Printf("existingUser.Password: %v\n", existingUser.Password)
 
 	if hashedRequestBodyPassword != existingUser.Password {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -217,15 +259,15 @@ func (uh *UserHandler) UserLogin(c *gin.Context) {
 
 	// user credentials have been verified
 	// generate jwt token
-	token, err := utils.CreateToken(existingUser.ID, existingUser.Email)
+	token, err := utils.CreateToken(&existingUser.ID, &existingUser.Email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.SetCookie("auth_token", token, int(time.Hour.Seconds()*24), "/", "", false, true)
+	c.SetCookie("auth_token", *token, int(time.Hour.Seconds()*24), "/", "", false, true)
 
-	c.String(http.StatusOK, "login successful")
+	c.JSON(http.StatusOK, gin.H{"message": "login successful"})
 }
 
 func (uh *UserHandler) UserLogout(c *gin.Context) {
