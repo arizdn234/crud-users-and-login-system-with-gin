@@ -15,10 +15,10 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func CreateToken(id uint, email string) (string, error) {
+func CreateToken(id *uint, email *string) (*string, error) {
 	claims := &Claims{
-		ID:    id,
-		Email: email,
+		ID:    *id,
+		Email: *email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)), // 1 hour
 		},
@@ -27,24 +27,21 @@ func CreateToken(id uint, email string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return tokenString, nil
+	return &tokenString, nil
 }
 
 func VerifyToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
+	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
+
+	claims, _ := token.Claims.(*Claims)
 
 	return claims, nil
 }
