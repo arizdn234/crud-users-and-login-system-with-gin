@@ -12,7 +12,7 @@
 vendor/
 
 # Ignore generated files
-# cmd/server
+crud-users-and-login-system-with-gin
 
 # Ignore database files
 *.db

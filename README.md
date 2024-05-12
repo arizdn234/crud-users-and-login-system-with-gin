@@ -12,13 +12,13 @@ To ensure code quality and reliability, the project includes comprehensive testi
 ## project-starter
 Use the following command to create the basic project structure:
 ```sh
-mkdir -p cmd/server internal/handlers internal/models internal/repository internal/server db/migrations config
-touch cmd/server/main.go \
-      internal/handlers/user_handler.go \
+mkdir -p internal/handlers internal/models internal/repository internal/server db/migrations config
+touch internal/handlers/user_handler.go \
       internal/models/user.go \
       internal/repository/user_repository.go \
       internal/server/server.go \
       go.mod
+      main.go
 ```
 
 > This command creates the basic structure for the project, including directories for server code, handlers, models, repository, server setup, database migrations, and configuration files.
